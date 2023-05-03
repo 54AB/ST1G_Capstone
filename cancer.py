@@ -19,6 +19,7 @@ from sklearn.model_selection import KFold
 from sklearn.model_selection import cross_val_score
 import pandas as pd
 import numpy as np
+import joblib
 
 ## Load the Cancer Dataset
 fileName = 'Cancer_Data.csv'
@@ -181,7 +182,11 @@ print(params)
    'degree': 3, 'gamma': 'auto', 'kernel': 'rbf', 'max_iter': -1,
      'probability': False, 'random_state': None, 'shrinking': True, 'tol': 0.001,
        'verbose': False}"""
-params_grid = {'C':[10, 5, 1, 0.5, 0.1, 0.01], 'gamma':[0.0001, 0.001, 0.01, 0.05, 0.1, 0.5, 1], 'kernel': ['rbf']}
+# Find optimal hyper parameter for this model
+params_grid = {'C':[10, 5, 1, 0.5, 0.1, 0.01],
+                'gamma':[0.0001, 0.001, 0.01, 0.05, 0.1, 0.5, 1],
+                  'kernel': ['rbf'],
+                  'probability': [True]}
 grs = GridSearchCV(model, params_grid, refit = True, verbose = 1, cv = 20)
 grs.fit(scaled_X_train, y_train)
 
@@ -197,4 +202,34 @@ print("Recall:",metrics.recall_score(y_test, y_prediction, average = 'weighted')
 print("F1-score:",metrics.f1_score(y_test, y_prediction, average = 'weighted'))
 print(confusion_matrix(y_test, y_prediction))
 print(classification_report(y_test, y_prediction))
+
+## Save the trained model
+saveFile = 'Best_SVM_Model.sav'
+joblib.dump(model_best, saveFile)
+
+# Load the model to make sure it is saved properly
+loaded_model = joblib.load(saveFile)
+final_y_pred = loaded_model.predict(scaled_X_test)
+print("Accuracy:",metrics.accuracy_score(y_test, final_y_pred))
+print("Precision:",metrics.precision_score(y_test, final_y_pred, average = 'weighted'))
+print("Recall:",metrics.recall_score(y_test, final_y_pred, average = 'weighted'))
+print("F1-score:",metrics.f1_score(y_test, final_y_pred, average = 'weighted'))
+print(confusion_matrix(y_test, final_y_pred))
+print(classification_report(y_test, final_y_pred))
+
+# Performance interpretation with lime, with example
+
+from lime import lime_tabular
+
+exp = lime_tabular.LimeTabularExplainer(scaled_X_train, 
+                                        class_names= ['benign', 'maglinant'], 
+                                        feature_names= X,
+                                        mode = 'classification' )
+
+explanation = exp.explain_instance(scaled_X_test[2], loaded_model.predict_proba,
+                                   num_features = len(X),
+                                   top_labels = 2)
+
+explanation.as_pyplot_figure()
+plt.show()
 
